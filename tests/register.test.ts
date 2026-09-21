@@ -21,7 +21,7 @@ describe('register', () => {
     expect(calendar?.argv.slice(1)).toEqual(['list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'])
 
     expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toBe(
-      '📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue',
+      '📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue\n(beneath)',
     )
   })
 

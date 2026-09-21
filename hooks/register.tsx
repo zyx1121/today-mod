@@ -1,3 +1,6 @@
+/* @jsxRuntime classic */
+/* @jsx h */
+/* @jsxFrag Fragment */
 import type { EngineInterface, On, PluginOptions, Timer } from 'claude-code'
 
 import { agendaOf, argvOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type Run, type Source } from './agenda'
@@ -211,8 +214,17 @@ export function register(on: On, options: PluginOptions): void {
     }
 
     const { Box, Text } = $.ui.resolve(e)
+    const [mine, beneath] = await Promise.all([
+      bandView({ Box, Text }, agenda, new Date(await $.clock.now())),
+      next(e),
+    ])
 
-    return bandView({ Box, Text }, agenda, new Date(await $.clock.now()))
+    return (
+      <Box flexDirection="column">
+        {mine}
+        {beneath}
+      </Box>
+    )
   })
 
   on('prompt.context', async ($, e, next) => {

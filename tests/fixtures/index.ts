@@ -133,7 +133,8 @@ export function world(
 }
 
 /**
- * A rendered tree's text: its strings in order.
+ * A rendered tree's text: its strings in order, one newline between a
+ * column Box's children.
  *
  * @param tree what `$.ui.render` resolved to
  * @returns the text
@@ -151,5 +152,21 @@ export function textOf(tree: unknown): string {
     return ''
   }
 
-  return textOf(Reflect.get(tree, 'children') ?? [])
+  const props: unknown = Reflect.get(tree, 'props')
+  const isColumn = typeof props === 'object' && props ? Reflect.get(props, 'flexDirection') === 'column' : false
+  const children: unknown = Reflect.get(tree, 'children') ?? []
+  const parts = Array.isArray(children) ? children.map(textOf) : [textOf(children)]
+
+  return parts.join(isColumn ? '\n' : '')
+}
+
+/**
+ * The mod's own line of a band render: the first line, what is beneath
+ * following on the next.
+ *
+ * @param tree what `$.ui.render` resolved to
+ * @returns the mod's line
+ */
+export function lineOf(tree: unknown): string {
+  return textOf(tree).split('\n')[0] ?? ''
 }

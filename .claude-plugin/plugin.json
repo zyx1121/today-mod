@@ -1,6 +1,6 @@
 {
   "name": "today-mod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "/today: the day's agenda for Claude and for you. Calendar events, E3 deadlines and Reminders are read through the zyx utils scripts, shown as one line above the prompt with a countdown to the next event, and handed to Claude as a context block so it knows your day.",
   "author": {
     "name": "zyx1121",
