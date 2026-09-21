@@ -1,0 +1,17 @@
+{
+  "name": "today-mod",
+  "owner": {
+    "name": "zyx1121",
+    "url": "https://github.com/zyx1121"
+  },
+  "description": "Marketplace for the today-mod plugin: /today, the day's agenda above the prompt and in Claude's context.",
+  "plugins": [
+    {
+      "name": "today-mod",
+      "source": "./",
+      "description": "/today: calendar, E3 deadlines and Reminders as one line above the prompt and a context block for Claude.",
+      "category": "productivity",
+      "tags": ["agenda", "calendar", "nycu", "band", "function-hooks"]
+    }
+  ]
+}

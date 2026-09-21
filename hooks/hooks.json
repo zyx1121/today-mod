@@ -1,0 +1,4 @@
+{
+  "description": "The Today band and context: on an interactive start the mod reads Calendar, E3 deadlines and Reminders through the zyx utils scripts, draws the next event with a countdown above the prompt, refreshes on a timer, and adds a `today` block to the conversation's context",
+  "modules": ["./register.ts"]
+}

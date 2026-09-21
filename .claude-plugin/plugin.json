@@ -1,0 +1,46 @@
+{
+  "name": "today-mod",
+  "version": "0.1.0",
+  "description": "/today: the day's agenda for Claude and for you. Calendar events, E3 deadlines and Reminders are read through the zyx utils scripts, shown as one line above the prompt with a countdown to the next event, and handed to Claude as a context block so it knows your day.",
+  "author": {
+    "name": "zyx1121",
+    "url": "https://github.com/zyx1121"
+  },
+  "userConfig": {
+    "scriptsDir": {
+      "type": "string",
+      "title": "utils scripts directory",
+      "description": "Where the zyx utils scripts live (calendar.py, reminders.py, e3p.py). Defaults to the iCloud clone of zyx1121/plugin.",
+      "required": false,
+      "default": "/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts"
+    },
+    "refreshMs": {
+      "type": "number",
+      "title": "Refresh interval",
+      "description": "Milliseconds between re-reads of the three sources. 300000 (5 minutes) by default; 60000 at the least.",
+      "required": false,
+      "default": 300000
+    },
+    "dueDays": {
+      "type": "number",
+      "title": "E3 deadline window",
+      "description": "Days ahead to list E3 deadlines. 7 by default.",
+      "required": false,
+      "default": 7
+    },
+    "remindersList": {
+      "type": "string",
+      "title": "Reminders list",
+      "description": "The Reminders list to read. TODO by default.",
+      "required": false,
+      "default": "TODO"
+    },
+    "showOnStart": {
+      "type": "boolean",
+      "title": "Show on start",
+      "description": "Show the line as soon as an interactive session starts. The last /today on|off choice, once made, wins over this.",
+      "required": false,
+      "default": true
+    }
+  }
+}
