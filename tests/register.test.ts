@@ -144,7 +144,7 @@ describe('register', () => {
   test("another session's recent reading is taken instead of running the scripts", async ($, on) => {
     const world = Fixtures.world(on)
 
-    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 60000, runs: Fixtures.KEPT })
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 30000, runs: Fixtures.KEPT })
 
     await $.session.start(Fixtures.SESSION)
     await world.clock.settle()
@@ -155,7 +155,32 @@ describe('register', () => {
     const text = (await $.command.run(Fixtures.today())).text ?? ''
 
     expect(text, 'a kept error stays an error').toContain('e3p: timed out')
-    expect(world.runs, '/today takes it too').toEqual([])
+    expect(world.runs, '/today takes a reading under a minute old').toEqual([])
+  })
+
+  test('/today reads the sources itself when the shared reading is over a minute old', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 120000, runs: Fixtures.KEPT })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.runs, 'the start takes it').toEqual([])
+
+    await $.command.run(Fixtures.today())
+
+    expect(world.runs.length).toBe(3)
+  })
+
+  test('the claim is in the shared file while the scripts run', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.sharedAtRun.length).toBe(3)
+    expect(JSON.parse(world.sharedAtRun[0] ?? 'null')).toEqual({ key: Fixtures.KEY, readAt: Fixtures.NOW, runs: null })
   })
 
   test("a reading of another day or older than refreshMs is read over", async ($, on) => {
@@ -169,7 +194,7 @@ describe('register', () => {
     expect(world.runs.length).toBe(3)
 
     world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 300000, runs: Fixtures.KEPT })
-    await $.command.run(Fixtures.today())
+    await world.clock.advance(5 * 60 * 1000)
 
     expect(world.runs.length).toBe(6)
   })

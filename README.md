@@ -64,14 +64,14 @@ The `today` context block carries the same agenda as Markdown: today's events wi
 ## How it is built
 
 - `hooks/register.ts` exports `register(on, options)`. On `session.start` it registers `/today`, reads the three sources in parallel and starts two timers: a re-read every `refreshMs`, a redraw every minute for the countdown. `command.run` answers `/today`. `ui.render` on `AbovePrompt` draws the line. `prompt.context` adds the `today` block, waiting up to 8 seconds for a first read still in flight.
-- `hooks/shared-read.ts` is the reading every session shares: a JSON file at `$TMPDIR/today-mod/agenda.json`, keyed by the three scripts' argv so another day never matches. A session takes the reading there when it is younger than `refreshMs`; while another session's read is under way it waits for that one (up to 35 seconds) instead of walking Calendar again.
+- `hooks/shared-read.ts` is the reading every session shares: a JSON file at `$TMPDIR/today-mod/agenda.json`, keyed by the three scripts' argv so another day never matches. A session takes the reading there when it is younger than `refreshMs`; while another session's read is under way it waits for that one (up to 35 seconds) instead of walking Calendar again. `/today` answers from a shared reading under a minute old, else reads the sources itself.
 - `hooks/agenda.ts` builds each script's argv, parses the utils JSON envelope (success and failure alike), and turns AppleScript dates (`Monday, September 21, 2026 at 1:20:00 PM`) into local Dates. A recurring calendar event reports its series' first date, so only the time of day is trusted.
 - `hooks/views/text.ts` formats the line and the Markdown; `hooks/views/band-view.tsx` draws the line with `Box` and `Text`.
 - `types/claude-code.d.ts` is the engine contract, copied from [`anthropics/claude-code/mods/types`](https://github.com/anthropics/claude-code/tree/main/mods/types).
 
 ```
 bunx -p typescript tsc -p tsconfig.json          # typecheck
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .   # 22 tests, the engine's own harness
+CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .   # 24 tests, the engine's own harness
 ```
 
 ## Contributing

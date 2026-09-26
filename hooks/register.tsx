@@ -29,6 +29,9 @@ export const CLAIM_POLL_MS = 2000
 /** A claim older than this (its reader died or hung) is read over. */
 export const CLAIM_MAX_AGE_MS = READ_TIMEOUT_MS + 5000
 
+/** The oldest shared reading /today answers with; older, it reads the sources itself. */
+export const COMMAND_MAX_AGE_MS = 60000
+
 type Settings = {
   scriptsDir: string
   refreshMs: number
@@ -128,31 +131,36 @@ export function register(on: On, options: PluginOptions): void {
   let isShown = false
   let host: Host | null = null
 
-  async function read(engine: Host): Promise<void> {
+  async function read(engine: Host, maxAgeMs = settings.refreshMs): Promise<void> {
     if (reading) {
       return reading
     }
 
     reading = (async () => {
-      const argvs = {} as Record<Source, readonly string[]>
-      let at = await engine.now()
-
-      for (const source of SOURCES) {
-        argvs[source] = argvOf(source, settings.scriptsDir, new Date(at), settings)
-      }
-
-      const key = keyOf(argvs)
+      let argvs = {} as Record<Source, readonly string[]>
+      let key = ''
+      let at = 0
 
       // another session's reading of the same day: take it when recent,
-      // wait for it while that session's read is under way
+      // wait for it while that session's read is under way; the day and the
+      // time are taken after each look, so a wait past midnight reads the new day
       for (;;) {
         const shared = await engine.readShared()
+
+        at = await engine.now()
+        argvs = {} as Record<Source, readonly string[]>
+
+        for (const source of SOURCES) {
+          argvs[source] = argvOf(source, settings.scriptsDir, new Date(at), settings)
+        }
+
+        key = keyOf(argvs)
 
         if (shared?.key !== key) {
           break
         }
 
-        if (shared.runs && isFresh(shared.readAt, at, settings.refreshMs)) {
+        if (shared.runs && isFresh(shared.readAt, at, maxAgeMs)) {
           agenda = agendaOf(runsOf(shared.runs), shared.readAt)
           engine.invalidate('ui.render')
           engine.invalidate('prompt.context')
@@ -165,7 +173,6 @@ export function register(on: On, options: PluginOptions): void {
         }
 
         await engine.sleep(CLAIM_POLL_MS)
-        at = await engine.now()
       }
 
       await engine.writeShared({ key, readAt: at, runs: null })
@@ -261,7 +268,7 @@ export function register(on: On, options: PluginOptions): void {
       start(engine)
     }
 
-    await read(engine)
+    await read(engine, COMMAND_MAX_AGE_MS)
 
     return { text: agenda ? agendaTextOf(agenda, new Date(await engine.now())) : NOT_READ_TEXT }
   })

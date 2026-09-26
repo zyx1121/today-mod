@@ -105,7 +105,8 @@ export const KEPT = {
  * @param on the test's `on`
  * @param answers what each script prints, by base name (mutable)
  * @param stored what the plugin's store holds at the start (mutated by sets)
- * @returns what was kept, the answers, the store, the shared files, the clock
+ * @returns what was kept, the answers, the store, the shared files (and what each
+ *   script run found there), the clock
  */
 export function world(
   on: On,
@@ -119,11 +120,13 @@ export function world(
   const runs: Args<'process.run'>[] = []
   const invalidated: string[] = []
   const files: Record<string, string> = {}
+  const sharedAtRun: (string | undefined)[] = []
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('process.run', ($, e) => {
     runs.push(e)
+    sharedAtRun.push(files[SHARED])
 
     const name = e.argv[0]?.split('/').at(-1) ?? ''
     const answer = answers[name] ?? { exitCode: 127, stdout: '', stderr: `no such script: ${name}` }
@@ -157,7 +160,7 @@ export function world(
 
   const clock = mock.clock(on, { now: NOW })
 
-  return { runs, invalidated, answers, stored, files, clock }
+  return { runs, invalidated, answers, stored, files, sharedAtRun, clock }
 }
 
 /**
