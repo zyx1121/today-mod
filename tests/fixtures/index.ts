@@ -80,6 +80,23 @@ export const E3P_LOGGED_OUT = {
 
 type Answer = { exitCode: number; stdout: string; stderr: string }
 
+/** Where the shared reading lives under the tests' TMPDIR. */
+export const SHARED = '/tmp/t/today-mod/agenda.json'
+
+/** The key the default settings read on NOW's day. */
+export const KEY = JSON.stringify([
+  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/calendar.py', 'list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'],
+  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/reminders.py', 'list', '--list', 'TODO', '--limit', '50'],
+  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/e3p.py', 'due', '--days', '7', '--limit', '50'],
+])
+
+/** The three answers as another session's shared reading keeps them. */
+export const KEPT = {
+  calendar: { exitCode: 0, stdout: CALENDAR, stderr: '' },
+  reminders: { exitCode: 0, stdout: EMPTY, stderr: '' },
+  e3p: { error: 'timed out' },
+}
+
 /**
  * The world beneath the mod: a session that starts, a command that
  * registers, each script answered by its base name, a band that draws
@@ -88,7 +105,8 @@ type Answer = { exitCode: number; stdout: string; stderr: string }
  * @param on the test's `on`
  * @param answers what each script prints, by base name (mutable)
  * @param stored what the plugin's store holds at the start (mutated by sets)
- * @returns what was kept, the answers, the store, the clock
+ * @returns what was kept, the answers, the store, the shared files (and what each
+ *   script run found there), the clock
  */
 export function world(
   on: On,
@@ -101,11 +119,14 @@ export function world(
 ) {
   const runs: Args<'process.run'>[] = []
   const invalidated: string[] = []
+  const files: Record<string, string> = {}
+  const sharedAtRun: (string | undefined)[] = []
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('process.run', ($, e) => {
     runs.push(e)
+    sharedAtRun.push(files[SHARED])
 
     const name = e.argv[0]?.split('/').at(-1) ?? ''
     const answer = answers[name] ?? { exitCode: 127, stdout: '', stderr: `no such script: ${name}` }
@@ -125,11 +146,21 @@ export function world(
     return { value: undefined }
   })
   on('prompt.context', ($, e) => ({ blocks: e.blocks }))
-  mock.env(on, { HOME: '/Users/loki' })
+  on('fs.read', ($, e) => {
+    const text = files[e.path]
+
+    return text === undefined ? { deny: `ENOENT: ${e.path}` } : { value: text }
+  })
+  on('fs.write', ($, e) => {
+    files[e.path] = e.text
+
+    return { value: undefined }
+  })
+  mock.env(on, { HOME: '/Users/loki', TMPDIR: '/tmp/t/' })
 
   const clock = mock.clock(on, { now: NOW })
 
-  return { runs, invalidated, answers, stored, clock }
+  return { runs, invalidated, answers, stored, files, sharedAtRun, clock }
 }
 
 /**

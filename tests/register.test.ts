@@ -128,6 +128,109 @@ describe('register', () => {
     expect(world.runs.length).toBe(6)
   })
 
+  test('a read leaves its runs in the shared file, keyed by the day', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    const shared = JSON.parse(world.files[Fixtures.SHARED] ?? 'null')
+
+    expect(shared.key).toBe(Fixtures.KEY)
+    expect(shared.readAt).toBe(Fixtures.NOW)
+    expect(shared.runs.calendar.stdout).toBe(Fixtures.CALENDAR)
+  })
+
+  test("another session's recent reading is taken instead of running the scripts", async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 30000, runs: Fixtures.KEPT })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.runs, 'nothing run').toEqual([])
+    expect(Fixtures.lineOf(await $.ui.render(Fixtures.BAND))).toContain('13:20 3D遊戲程式')
+
+    const text = (await $.command.run(Fixtures.today())).text ?? ''
+
+    expect(text, 'a kept error stays an error').toContain('e3p: timed out')
+    expect(world.runs, '/today takes a reading under a minute old').toEqual([])
+  })
+
+  test('/today reads the sources itself when the shared reading is over a minute old', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 120000, runs: Fixtures.KEPT })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.runs, 'the start takes it').toEqual([])
+
+    await $.command.run(Fixtures.today())
+
+    expect(world.runs.length).toBe(3)
+  })
+
+  test('the claim is in the shared file while the scripts run', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.sharedAtRun.length).toBe(3)
+    expect(JSON.parse(world.sharedAtRun[0] ?? 'null')).toEqual({ key: Fixtures.KEY, readAt: Fixtures.NOW, runs: null })
+  })
+
+  test("a reading of another day or older than refreshMs is read over", async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: '[]', readAt: Fixtures.NOW, runs: Fixtures.KEPT })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+
+    expect(world.runs.length).toBe(3)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 300000, runs: Fixtures.KEPT })
+    await world.clock.advance(5 * 60 * 1000)
+
+    expect(world.runs.length).toBe(6)
+  })
+
+  test("a start during another session's read waits for it, then takes it", async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW, runs: null })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.advance(2000)
+
+    expect(Fixtures.lineOf(await $.ui.render(Fixtures.BAND))).not.toContain('13:20')
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW + 3000, runs: Fixtures.KEPT })
+    await world.clock.advance(2000)
+
+    expect(world.runs, 'nothing run of its own').toEqual([])
+    expect(Fixtures.lineOf(await $.ui.render(Fixtures.BAND))).toContain('13:20 3D遊戲程式')
+  })
+
+  test('a claim nobody finishes is read over once it is stale', async ($, on) => {
+    const world = Fixtures.world(on)
+
+    world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW, runs: null })
+
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.advance(30000)
+
+    expect(world.runs).toEqual([])
+
+    await world.clock.advance(6000)
+
+    expect(world.runs.length).toBe(3)
+  })
+
   test('a non-interactive start reads nothing', async ($, on) => {
     const world = Fixtures.world(on)
 

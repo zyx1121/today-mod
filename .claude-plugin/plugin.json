@@ -1,6 +1,6 @@
 {
   "name": "today-mod",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "/today: the day's agenda for Claude and for you. Calendar events, E3 deadlines and Reminders are read through the zyx utils scripts, shown as one line above the prompt with a countdown to the next event, and handed to Claude as a context block so it knows your day.",
   "author": {
     "name": "zyx1121",
@@ -17,7 +17,7 @@
     "refreshMs": {
       "type": "number",
       "title": "Refresh interval",
-      "description": "Milliseconds between re-reads of the three sources. 300000 (5 minutes) by default; 60000 at the least.",
+      "description": "Milliseconds between re-reads of the three sources, shared by every open session. 300000 (5 minutes) by default; 60000 at the least.",
       "required": false,
       "default": 300000
     },
