@@ -4,6 +4,7 @@
 import type { EngineInterface, On, PluginOptions, Timer } from 'claude-code'
 
 import { agendaOf, argvOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type Run, type Source } from './agenda'
+import { cachePathOf, entryOf, isFresh, keptOf, keyOf, runsOf, type Entry } from './shared-read'
 import { bandView } from './views/band-view'
 import { agendaTextOf } from './views/text'
 
@@ -21,6 +22,12 @@ export const NOT_READ_TEXT = 'Today has not been read yet; try again in a moment
 
 /** How long `prompt.context` waits for a first read still in flight. */
 export const CONTEXT_WAIT_MS = 8000
+
+/** How often a session waiting on another session's read looks at the shared file. */
+export const CLAIM_POLL_MS = 2000
+
+/** A claim older than this (its reader died or hung) is read over. */
+export const CLAIM_MAX_AGE_MS = READ_TIMEOUT_MS + 5000
 
 type Settings = {
   scriptsDir: string
@@ -65,6 +72,9 @@ type Host = {
   run: (argv: readonly string[], init: { timeoutMs: number; env: Record<string, string> }) => Promise<Run>
   home: () => Promise<string | undefined>
   now: () => Promise<number>
+  sleep: (ms: number) => Promise<void>
+  readShared: () => Promise<Entry | null>
+  writeShared: (entry: Entry) => Promise<void>
   invalidate: (event: 'ui.render' | 'prompt.context') => void
   every: (ms: number, fn: () => void) => Timer
   storeGet: (key: string) => Promise<unknown>
@@ -72,16 +82,26 @@ type Host = {
 }
 
 /**
- * The engine calls the band needs, taken off `$`.
+ * The engine calls the band needs, taken off `$`. The shared reading lives
+ * under `TMPDIR`; a file the engine cannot read or write counts as absent.
  *
  * @param $ the engine
  * @returns the host
  */
-function hostOf($: EngineInterface): Host {
+async function hostOf($: EngineInterface): Promise<Host> {
+  const path = cachePathOf(await $.env.get('TMPDIR').catch(() => undefined))
+
   return {
     run: (argv, init) => $.process.run(argv, init),
     home: () => $.env.get('HOME'),
     now: () => $.clock.now(),
+    sleep: ms => $.clock.sleep(ms),
+    readShared: () =>
+      $.fs.read(path).then(
+        text => (typeof text === 'string' ? entryOf(text) : null),
+        () => null,
+      ),
+    writeShared: entry => $.fs.write(path, JSON.stringify(entry)).catch(() => undefined),
     invalidate: event => $.ui.invalidate(event),
     every: (ms, fn) => $.clock.every(ms, fn),
     storeGet: key => $.store.get(key),
@@ -114,20 +134,58 @@ export function register(on: On, options: PluginOptions): void {
     }
 
     reading = (async () => {
+      const argvs = {} as Record<Source, readonly string[]>
+      let at = await engine.now()
+
+      for (const source of SOURCES) {
+        argvs[source] = argvOf(source, settings.scriptsDir, new Date(at), settings)
+      }
+
+      const key = keyOf(argvs)
+
+      // another session's reading of the same day: take it when recent,
+      // wait for it while that session's read is under way
+      for (;;) {
+        const shared = await engine.readShared()
+
+        if (shared?.key !== key) {
+          break
+        }
+
+        if (shared.runs && isFresh(shared.readAt, at, settings.refreshMs)) {
+          agenda = agendaOf(runsOf(shared.runs), shared.readAt)
+          engine.invalidate('ui.render')
+          engine.invalidate('prompt.context')
+
+          return
+        }
+
+        if (shared.runs || !isFresh(shared.readAt, at, CLAIM_MAX_AGE_MS)) {
+          break
+        }
+
+        await engine.sleep(CLAIM_POLL_MS)
+        at = await engine.now()
+      }
+
+      await engine.writeShared({ key, readAt: at, runs: null })
+
       const home = (await engine.home().catch(() => undefined)) ?? '/Users/loki'
       const env = { PATH: pathOf(home), HOME: home }
-      const now = new Date(await engine.now())
       const runs = {} as Record<Source, Run | Error>
 
       await Promise.all(
         SOURCES.map(async source => {
           runs[source] = await engine
-            .run(argvOf(source, settings.scriptsDir, now, settings), { timeoutMs: READ_TIMEOUT_MS, env })
+            .run(argvs[source], { timeoutMs: READ_TIMEOUT_MS, env })
             .catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))))
         }),
       )
 
-      agenda = agendaOf(runs, await engine.now())
+      const readAt = await engine.now()
+
+      agenda = agendaOf(runs, readAt)
+      await engine.writeShared({ key, readAt, runs: keptOf(runs) })
       engine.invalidate('ui.render')
       engine.invalidate('prompt.context')
     })().finally(() => {
@@ -170,7 +228,7 @@ export function register(on: On, options: PluginOptions): void {
     }
 
     if (e.isInteractive && e.surface === 'terminal') {
-      const engine = hostOf($)
+      const engine = await hostOf($)
       const kept = await engine.storeGet(STORE_SHOWN_KEY).catch(() => undefined)
 
       isShown = isShownAtStart(kept, settings)
@@ -182,7 +240,7 @@ export function register(on: On, options: PluginOptions): void {
   })
 
   on('command.run', { command: COMMAND_NAME }, async ($, e) => {
-    const engine = hostOf($)
+    const engine = await hostOf($)
     const want = e.args.trim().toLowerCase()
 
     if (want === 'on' || want === 'off') {
