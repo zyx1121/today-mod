@@ -172,8 +172,9 @@ export function appleDateOf(text: string): Date | null {
 }
 
 /**
- * Calendar rows as events, by their time of day (a recurring event reports
- * its series' first date, so only the time is trusted).
+ * Calendar rows as events, by their time of day. Only the time is used: the
+ * argv covers one day, and utils before 0.24.1 gave a recurring event its
+ * series' first date.
  *
  * @param rows the envelope's data
  * @returns the events, earliest first
