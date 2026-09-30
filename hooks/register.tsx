@@ -7,14 +7,14 @@ import { agendaOf, argvOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type R
 import { cachePathOf, entryOf, isFresh, keptOf, keyOf, runsOf, type Entry } from './shared-read'
 import { bandView } from './views/band-view'
 import { agendaTextOf } from './views/text'
+import { sourceDirs } from './script-paths'
 
 export const COMMAND_NAME = 'today'
 export const CONTEXT_BLOCK = 'today'
 export const DEFAULT_REFRESH_MS = 300000
 export const MIN_REFRESH_MS = 60000
 export const TICK_MS = 60000
-export const DEFAULT_SCRIPTS_DIR =
-  '/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts'
+export const DEFAULT_SCRIPTS_DIR = ''
 export const STORE_SHOWN_KEY = 'shown'
 export const SHOWN_TEXT = 'Today shown above the prompt'
 export const HIDDEN_TEXT = 'Today hidden'
@@ -34,6 +34,8 @@ export const COMMAND_MAX_AGE_MS = 60000
 
 type Settings = {
   scriptsDir: string
+  macosScriptsDir: string
+  nycuScriptsDir: string
   refreshMs: number
   dueDays: number
   remindersList: string
@@ -51,6 +53,8 @@ export function settingsOf(options: PluginOptions): Settings {
 
   return {
     scriptsDir: typeof options.scriptsDir === 'string' && options.scriptsDir !== '' ? options.scriptsDir : DEFAULT_SCRIPTS_DIR,
+    macosScriptsDir: typeof options.macosScriptsDir === 'string' ? options.macosScriptsDir : '',
+    nycuScriptsDir: typeof options.nycuScriptsDir === 'string' ? options.nycuScriptsDir : '',
     refreshMs:
       typeof refreshMs === 'number' && Number.isFinite(refreshMs) ? Math.max(MIN_REFRESH_MS, Math.floor(refreshMs)) : DEFAULT_REFRESH_MS,
     dueDays: typeof options.dueDays === 'number' && options.dueDays > 0 ? Math.floor(options.dueDays) : 7,
@@ -74,6 +78,7 @@ export function isShownAtStart(kept: unknown, settings: Settings): boolean {
 type Host = {
   run: (argv: readonly string[], init: { timeoutMs: number; env: Record<string, string> }) => Promise<Run>
   home: () => Promise<string | undefined>
+  installed: () => Promise<string>
   now: () => Promise<number>
   sleep: (ms: number) => Promise<void>
   readShared: () => Promise<Entry | null>
@@ -93,10 +98,14 @@ type Host = {
  */
 async function hostOf($: EngineInterface): Promise<Host> {
   const path = cachePathOf(await $.env.get('TMPDIR').catch(() => undefined))
+  const home = await $.env.get('HOME')
+  const config = await $.env.get('CLAUDE_CONFIG_DIR')
+  const registry = `${config || `${home}/.claude`}/plugins/installed_plugins.json`
 
   return {
     run: (argv, init) => $.process.run(argv, init),
     home: () => $.env.get('HOME'),
+    installed: () => $.fs.read(registry).then(text => typeof text === 'string' ? text : '', () => ''),
     now: () => $.clock.now(),
     sleep: ms => $.clock.sleep(ms),
     readShared: () =>
@@ -137,6 +146,7 @@ export function register(on: On, options: PluginOptions): void {
     }
 
     reading = (async () => {
+      const dirs = sourceDirs(settings, await engine.installed())
       let argvs = {} as Record<Source, readonly string[]>
       let key = ''
       let at = 0
@@ -151,7 +161,7 @@ export function register(on: On, options: PluginOptions): void {
         argvs = {} as Record<Source, readonly string[]>
 
         for (const source of SOURCES) {
-          argvs[source] = argvOf(source, settings.scriptsDir, new Date(at), settings)
+          argvs[source] = argvOf(source, dirs[source], new Date(at), settings)
         }
 
         key = keyOf(argvs)
@@ -183,6 +193,10 @@ export function register(on: On, options: PluginOptions): void {
 
       await Promise.all(
         SOURCES.map(async source => {
+          if (!dirs[source]) {
+            runs[source] = new Error(`install ${source === 'e3p' ? 'nycu' : 'macos'}@zyx1121 or configure its scripts directory`)
+            return
+          }
           runs[source] = await engine
             .run(argvs[source], { timeoutMs: READ_TIMEOUT_MS, env })
             .catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))))

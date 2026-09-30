@@ -1,7 +1,7 @@
 {
   "name": "today-mod",
-  "version": "0.2.0",
-  "description": "/today: the day's agenda for Claude and for you. Calendar events, E3 deadlines and Reminders are read through the zyx utils scripts, shown as one line above the prompt with a countdown to the next event, and handed to Claude as a context block so it knows your day.",
+  "version": "0.3.0",
+  "description": "/today: the day's agenda for Claude and for you. Calendar events, E3 deadlines and Reminders are read through the macos and nycu plugin scripts, shown as one line above the prompt with a countdown to the next event, and handed to Claude as a context block so it knows your day.",
   "author": {
     "name": "zyx1121",
     "url": "https://github.com/zyx1121"
@@ -9,10 +9,10 @@
   "userConfig": {
     "scriptsDir": {
       "type": "string",
-      "title": "utils scripts directory",
-      "description": "Where the zyx utils scripts live (calendar.py, reminders.py, e3p.py). Defaults to the iCloud clone of zyx1121/plugin.",
+      "title": "Legacy shared scripts directory",
+      "description": "Optional explicit directory for all three scripts. Prefer the separate macos and nycu overrides. Empty resolves installed plugins automatically.",
       "required": false,
-      "default": "/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts"
+      "default": ""
     },
     "refreshMs": {
       "type": "number",
@@ -41,6 +41,20 @@
       "description": "Show the line as soon as an interactive session starts. The last /today on|off choice, once made, wins over this.",
       "required": false,
       "default": true
+    },
+    "macosScriptsDir": {
+      "type": "string",
+      "title": "macos scripts directory",
+      "description": "Optional scripts directory override for macos. Empty resolves the current macos@zyx1121 user installation.",
+      "required": false,
+      "default": ""
+    },
+    "nycuScriptsDir": {
+      "type": "string",
+      "title": "nycu scripts directory",
+      "description": "Optional scripts directory override for nycu. Empty resolves the current nycu@zyx1121 user installation.",
+      "required": false,
+      "default": ""
     }
   }
 }

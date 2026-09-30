@@ -85,9 +85,9 @@ export const SHARED = '/tmp/t/today-mod/agenda.json'
 
 /** The key the default settings read on NOW's day. */
 export const KEY = JSON.stringify([
-  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/calendar.py', 'list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'],
-  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/reminders.py', 'list', '--list', 'TODO', '--limit', '50'],
-  ['/Users/loki/Library/Mobile Documents/com~apple~CloudDocs/Projects/zyx1121/plugin/utils/scripts/e3p.py', 'due', '--days', '7', '--limit', '50'],
+  ['/plugins/macos/0.1.0/scripts/calendar.py', 'list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'],
+  ['/plugins/macos/0.1.0/scripts/reminders.py', 'list', '--list', 'TODO', '--limit', '50'],
+  ['/plugins/nycu/0.1.0/scripts/e3p.py', 'due', '--days', '7', '--limit', '50'],
 ])
 
 /** The three answers as another session's shared reading keeps them. */
@@ -156,6 +156,10 @@ export function world(
 
     return { value: undefined }
   })
+  files['/Users/loki/.claude/plugins/installed_plugins.json'] = JSON.stringify({ plugins: {
+    'macos@zyx1121': [{ scope: 'user', installPath: '/plugins/macos/0.1.0' }],
+    'nycu@zyx1121': [{ scope: 'user', installPath: '/plugins/nycu/0.1.0' }],
+  } })
   mock.env(on, { HOME: '/Users/loki', TMPDIR: '/tmp/t/' })
 
   const clock = mock.clock(on, { now: NOW })

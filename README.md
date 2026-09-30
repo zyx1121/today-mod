@@ -13,7 +13,7 @@
 
 Sessions start with "what was I supposed to do today?" and end with a missed class. This mod reads the day once at start, keeps the next thing in view, and hands the whole agenda to Claude as a context block, so "do I have time for this before class?" gets a real answer.
 
-It is a Claude Code **mod**: a plugin whose behaviour lives in a TypeScript hooks module. The data comes from three [zyx utils](https://github.com/zyx1121/plugin) scripts run as child processes (`calendar.py`, `reminders.py`, `e3p.py`), nothing else.
+It is a Claude Code **mod**: a plugin whose behaviour lives in a TypeScript hooks module. The data comes from [macos](https://github.com/zyx1121/macos) and [nycu](https://github.com/zyx1121/nycu) scripts run as child processes (`calendar.py`, `reminders.py`, `e3p.py`), nothing else.
 
 ## Install
 
@@ -30,7 +30,7 @@ Then install it as a plugin, from GitHub or from a local clone:
 /plugin install today-mod@today-mod
 ```
 
-It needs the zyx utils scripts on disk (see `scriptsDir`), `uv` at `/opt/homebrew/bin/uv`, Full Access to Calendars and Reminders for your terminal (System Settings > Privacy & Security; zyx utils 0.24.1 and later read both through EventKit, so neither app opens), and an E3 login (`utils e3p login`) for deadlines. A source that is missing or denied is reported on the line and in `/today`; the others still show.
+It needs `macos@zyx1121` and `nycu@zyx1121` installed at user scope (or explicit `macosScriptsDir` and `nycuScriptsDir` settings), `uv` at `/opt/homebrew/bin/uv`, Full Access to Calendars and Reminders for your terminal (System Settings > Privacy & Security; macos reads both through EventKit, so neither app opens), and an E3 login configured through [nycu](https://github.com/zyx1121/nycu) for deadlines. A source that is missing or denied is reported on the line and in `/today`; the others still show.
 
 In the session:
 
@@ -55,7 +55,9 @@ The `today` context block carries the same agenda as Markdown: today's events wi
 
 | Field | Type | Default | What it does |
 |-------|------|---------|--------------|
-| `scriptsDir` | string | the iCloud clone of `zyx1121/plugin`, `utils/scripts` | Where `calendar.py`, `reminders.py` and `e3p.py` live |
+| `macosScriptsDir` | string | current `macos@zyx1121` user installation | Optional directory for `calendar.py` and `reminders.py` |
+| `nycuScriptsDir` | string | current `nycu@zyx1121` user installation | Optional directory for `e3p.py` |
+| `scriptsDir` | string | empty | Legacy explicit shared directory; separate overrides take precedence |
 | `refreshMs` | number | `300000` | Milliseconds between re-reads. Every open session shares one read per interval. Floored at 60000. |
 | `dueDays` | number | `7` | Days ahead to list E3 deadlines |
 | `remindersList` | string | `TODO` | The Reminders list to read |
@@ -65,7 +67,7 @@ The `today` context block carries the same agenda as Markdown: today's events wi
 
 - `hooks/register.ts` exports `register(on, options)`. On `session.start` it registers `/today`, reads the three sources in parallel and starts two timers: a re-read every `refreshMs`, a redraw every minute for the countdown. `command.run` answers `/today`. `ui.render` on `AbovePrompt` draws the line. `prompt.context` adds the `today` block, waiting up to 8 seconds for a first read still in flight.
 - `hooks/shared-read.ts` is the reading every session shares: a JSON file at `$TMPDIR/today-mod/agenda.json`, keyed by the three scripts' argv so another day never matches. A session takes the reading there when it is younger than `refreshMs`; while another session's read is under way it waits for that one (up to 35 seconds) instead of walking Calendar again. `/today` answers from a shared reading under a minute old, else reads the sources itself.
-- `hooks/agenda.ts` builds each script's argv, parses the utils JSON envelope (success and failure alike), and turns the scripts' AppleScript-form dates (`Monday, September 21, 2026 at 1:20:00 PM`) into local Dates. Only an event's time of day is used: the calendar argv covers one day, and utils before 0.24.1 gave a recurring event its series' first date.
+- `hooks/agenda.ts` builds each script's argv, parses the JSON envelope (success and failure alike), and turns the scripts' AppleScript-form dates (`Monday, September 21, 2026 at 1:20:00 PM`) into local Dates. Only an event's time of day is used: the calendar argv covers one day, and utils before 0.24.1 gave a recurring event its series' first date.
 - `hooks/views/text.ts` formats the line and the Markdown; `hooks/views/band-view.tsx` draws the line with `Box` and `Text`.
 - `types/claude-code.d.ts` is the engine contract, copied from [`anthropics/claude-code/mods/types`](https://github.com/anthropics/claude-code/tree/main/mods/types).
 

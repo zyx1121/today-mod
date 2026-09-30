@@ -5,6 +5,20 @@ import * as Fixtures from './fixtures'
 tier('user')
 
 describe('register', () => {
+  test('a missing macos installation preserves E3 and explains the missing sources', async ($, on) => {
+    const world = Fixtures.world(on)
+    world.files['/Users/loki/.claude/plugins/installed_plugins.json'] = JSON.stringify({ plugins: {
+      'nycu@zyx1121': [{ scope: 'user', installPath: '/plugins/nycu/0.1.0' }],
+    } })
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+    expect(world.runs.map(run => run.argv[0]?.split('/').at(-1))).toEqual(['e3p.py'])
+    const { text } = await $.command.run(Fixtures.today())
+    expect(text).toContain('install macos@zyx1121')
+    expect(text).toContain('HW1')
+  })
+
+
   test('an interactive start reads the three sources and draws the next event', async ($, on) => {
     const world = Fixtures.world(on)
 
