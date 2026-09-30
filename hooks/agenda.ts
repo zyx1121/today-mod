@@ -1,5 +1,5 @@
 /**
- * What the day holds, read through three zyx utils scripts and parsed from
+ * What the day holds, read through the macos and nycu plugin scripts and parsed from
  * their JSON envelopes.
  */
 
