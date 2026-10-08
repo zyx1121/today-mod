@@ -5,6 +5,38 @@ import * as Fixtures from './fixtures'
 tier('user')
 
 describe('register', () => {
+  test('native pagination is followed and bodies stay on stdin', async ($, on) => {
+    const answers = {
+      'calendar.py': {exitCode:0,stdout:JSON.stringify({success:true,data:{items:JSON.parse(Fixtures.CALENDAR).data.items.slice(0,1),next_cursor:'next'}}),stderr:''},
+      'calendar.py next': {exitCode:0,stdout:JSON.stringify({success:true,data:{items:JSON.parse(Fixtures.CALENDAR).data.items.slice(1),next_cursor:null}}),stderr:''},
+      'reminders.py': {exitCode:0,stdout:Fixtures.REMINDERS,stderr:''},
+      'e3p.py': {exitCode:0,stdout:Fixtures.E3P,stderr:''},
+    }
+    const world=Fixtures.world(on,answers)
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+    const requests=world.runs.filter(run=>run.argv[1]==='calendar_list_events')
+    expect(requests.length).toBe(2)
+    expect(JSON.parse(requests[1]?.init?.stdin ?? '{}').cursor).toBe('next')
+    expect(requests.every(run=>run.argv.length===2)).toBe(true)
+    const shared=JSON.parse(world.files[Fixtures.SHARED] ?? '{}')
+    expect(JSON.parse(shared.runs.calendar.stdout).data.length).toBe(2)
+  })
+
+  test('ambiguous reminder list names are refused without reading tasks', async ($, on) => {
+    const world=Fixtures.world(on,{
+      'calendar.py':{exitCode:0,stdout:Fixtures.CALENDAR,stderr:''},
+      'e3p.py':{exitCode:0,stdout:Fixtures.E3P,stderr:''},
+      'reminders_list_lists':{exitCode:0,stdout:JSON.stringify({success:true,data:[{id:'a',title:'TODO'},{id:'b',title:'TODO'}]}),stderr:''},
+    })
+    await $.session.start(Fixtures.SESSION)
+    await world.clock.settle()
+    expect(world.runs.some(run=>run.argv[1]==='reminders_list')).toBe(false)
+    const {text}=await $.command.run(Fixtures.today())
+    expect(text).toContain('ambiguous')
+    expect(text).toContain('HW1')
+  })
+
   test('a missing macos installation preserves E3 and explains the missing sources', async ($, on) => {
     const world = Fixtures.world(on)
     world.files['/Users/loki/.claude/plugins/installed_plugins.json'] = JSON.stringify({ plugins: {
@@ -27,12 +59,12 @@ describe('register', () => {
 
     const scripts = world.runs.map(run => run.argv[0]?.split('/').at(-1)).sort()
 
-    expect(scripts).toEqual(['calendar.py', 'e3p.py', 'reminders.py'])
+    expect(scripts).toEqual(['e3p.py', 'productivity.py', 'productivity.py', 'productivity.py'])
     expect(world.runs.every(run => run.init?.env?.PATH?.startsWith('/opt/homebrew/bin')), 'uv is on the child PATH').toBe(true)
 
-    const calendar = world.runs.find(run => run.argv[0]?.endsWith('calendar.py'))
+    const calendar = world.runs.find(run => run.argv[1] === 'calendar_list_events')
 
-    expect(calendar?.argv.slice(1)).toEqual(['list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'])
+    expect(calendar?.argv.slice(1)).toEqual(['calendar_list_events'])
 
     expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toBe(
       '📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue\n(beneath)',
@@ -101,7 +133,7 @@ describe('register', () => {
     await $.session.start(Fixtures.SESSION)
     await world.clock.settle()
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
     expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toBe('(beneath)')
 
     const { blocks } = await $.prompt.context({ blocks: [], instructionFiles: [] })
@@ -135,11 +167,11 @@ describe('register', () => {
     await $.session.start(Fixtures.SESSION)
     await world.clock.settle()
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
 
     await world.clock.advance(5 * 60 * 1000)
 
-    expect(world.runs.length).toBe(6)
+    expect(world.runs.length).toBe(8)
   })
 
   test('a read leaves its runs in the shared file, keyed by the day', async ($, on) => {
@@ -152,7 +184,7 @@ describe('register', () => {
 
     expect(shared.key).toBe(Fixtures.KEY)
     expect(shared.readAt).toBe(Fixtures.NOW)
-    expect(shared.runs.calendar.stdout).toBe(Fixtures.CALENDAR)
+    expect(JSON.parse(shared.runs.calendar.stdout).data).toEqual(JSON.parse(Fixtures.CALENDAR).data.items)
   })
 
   test("another session's recent reading is taken instead of running the scripts", async ($, on) => {
@@ -184,7 +216,7 @@ describe('register', () => {
 
     await $.command.run(Fixtures.today())
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
   })
 
   test('the claim is in the shared file while the scripts run', async ($, on) => {
@@ -193,7 +225,7 @@ describe('register', () => {
     await $.session.start(Fixtures.SESSION)
     await world.clock.settle()
 
-    expect(world.sharedAtRun.length).toBe(3)
+    expect(world.sharedAtRun.length).toBe(4)
     expect(JSON.parse(world.sharedAtRun[0] ?? 'null')).toEqual({ key: Fixtures.KEY, readAt: Fixtures.NOW, runs: null })
   })
 
@@ -205,12 +237,12 @@ describe('register', () => {
     await $.session.start(Fixtures.SESSION)
     await world.clock.settle()
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
 
     world.files[Fixtures.SHARED] = JSON.stringify({ key: Fixtures.KEY, readAt: Fixtures.NOW - 300000, runs: Fixtures.KEPT })
     await world.clock.advance(5 * 60 * 1000)
 
-    expect(world.runs.length).toBe(6)
+    expect(world.runs.length).toBe(8)
   })
 
   test("a start during another session's read waits for it, then takes it", async ($, on) => {
@@ -242,7 +274,7 @@ describe('register', () => {
 
     await world.clock.advance(6000)
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
   })
 
   test('a non-interactive start reads nothing', async ($, on) => {
@@ -264,6 +296,6 @@ describe('register', () => {
     await $.session.end({ reason: 'other', sessionId: 's1', resume: { id: 's1' } })
     await world.clock.advance(60 * 60 * 1000)
 
-    expect(world.runs.length).toBe(3)
+    expect(world.runs.length).toBe(4)
   })
 })

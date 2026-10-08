@@ -1,3 +1,4 @@
+import { argvOf, inputOf, SOURCES } from '../../hooks/agenda'
 import type { Args, CommandRunInput, On, RenderElement, RenderInput, SessionStartInput } from 'claude-code'
 import { mock } from 'claude-code/testing'
 
@@ -40,24 +41,24 @@ export const BAND: RenderInput<'AbovePrompt'> = {
 /** What the world beneath draws in the band when the mod passes. */
 export const BENEATH: RenderElement = { type: 'Text', children: ['(beneath)'] }
 
-/** calendar.py's answer: a class at 13:20 and a recurring meeting reporting its series' first date. */
+/** API v2 event occurrences for the current local day. */
 export const CALENDAR = JSON.stringify({
   success: true,
-  data: [
-    { calendar: 'loki.cs14@nycu.edu.tw', start: 'Monday, September 21, 2026 at 1:20:00 PM', summary: '3D遊戲程式', location: 'ED102' },
-    { calendar: 'loki.cs14@nycu.edu.tw', start: 'Monday, July 13, 2026 at 3:30:00 PM', summary: 'Lab Meetings', location: 'EC411' },
-  ],
+  data: { items: [
+    { id: 'e1', start: {kind:'datetime', at:new Date(2026,8,21,13,20).toISOString(),time_zone:Intl.DateTimeFormat().resolvedOptions().timeZone}, title: '3D遊戲程式', location: 'ED102' },
+    { id: 'e2', start: {kind:'datetime', at:new Date(2026,8,21,15,30).toISOString(),time_zone:Intl.DateTimeFormat().resolvedOptions().timeZone}, title: 'Lab Meetings', location: 'EC411' },
+  ], next_cursor: null },
   metadata: { count: 2 },
 })
 
-/** reminders.py's answer: one overdue, one done, one without a due. */
+/** API v2 reminders: one overdue, one completed and one without a due. */
 export const REMINDERS = JSON.stringify({
   success: true,
-  data: [
-    { name: 'Reply to advisor', due: 'Sunday, September 20, 2026 at 6:00:00 PM', done: false },
-    { name: 'Old thing', due: '', done: true },
-    { name: 'Buy filament', due: '', done: false },
-  ],
+  data: { items: [
+    { id:'r1', title: 'Reply to advisor', due: {kind:'datetime',at:new Date(2026,8,20,18).toISOString(),time_zone:Intl.DateTimeFormat().resolvedOptions().timeZone}, completed: false },
+    { id:'r2', title: 'Old thing', due: null, completed: true },
+    { id:'r3', title: 'Buy filament', due: null, completed: false },
+  ], next_cursor: null },
   metadata: { count: 3, list: 'TODO' },
 })
 
@@ -84,11 +85,7 @@ type Answer = { exitCode: number; stdout: string; stderr: string }
 export const SHARED = '/tmp/t/today-mod/agenda.json'
 
 /** The key the default settings read on NOW's day. */
-export const KEY = JSON.stringify([
-  ['/plugins/macos/0.1.0/scripts/calendar.py', 'list', '--from', '2026-09-21T00:00', '--to', '2026-09-21T23:59', '--limit', '50'],
-  ['/plugins/macos/0.1.0/scripts/reminders.py', 'list', '--list', 'TODO', '--limit', '50'],
-  ['/plugins/nycu/0.1.0/scripts/e3p.py', 'due', '--days', '7', '--limit', '50'],
-])
+export const KEY = JSON.stringify(SOURCES.map(source => [...argvOf(source, source === 'e3p' ? '/plugins/nycu/0.1.0/scripts' : '/plugins/macos/0.2.0/scripts', new Date(NOW), {remindersList:'TODO',dueDays:7}), JSON.stringify(inputOf(source,new Date(NOW))) ?? '', source==='reminders'?'TODO':'']))
 
 /** The three answers as another session's shared reading keeps them. */
 export const KEPT = {
@@ -128,8 +125,10 @@ export function world(
     runs.push(e)
     sharedAtRun.push(files[SHARED])
 
-    const name = e.argv[0]?.split('/').at(-1) ?? ''
-    const answer = answers[name] ?? { exitCode: 127, stdout: '', stderr: `no such script: ${name}` }
+    const name = e.argv[0]?.endsWith('productivity.py') ? e.argv[1] === 'calendar_list_events' ? 'calendar.py' : 'reminders.py' : e.argv[0]?.split('/').at(-1) ?? ''
+    if (e.argv[1] === 'reminders_list_lists') return {value:answers['reminders_list_lists'] ?? {exitCode:0,stdout:JSON.stringify({success:true,data:[{id:'list-1',title:'TODO',account:'iCloud',writable:true}]}),stderr:''}}
+    const cursor = e.init?.stdin ? JSON.parse(e.init.stdin).cursor : null
+    const answer = answers[cursor ? `${name} next` : name] ?? { exitCode: 127, stdout: '', stderr: `no such script: ${name}` }
 
     return { value: answer }
   })
@@ -157,7 +156,7 @@ export function world(
     return { value: undefined }
   })
   files['/Users/loki/.claude/plugins/installed_plugins.json'] = JSON.stringify({ plugins: {
-    'macos@zyx1121': [{ scope: 'user', installPath: '/plugins/macos/0.1.0' }],
+    'macos@zyx1121': [{ scope: 'user', installPath: '/plugins/macos/0.2.0' }],
     'nycu@zyx1121': [{ scope: 'user', installPath: '/plugins/nycu/0.1.0' }],
   } })
   mock.env(on, { HOME: '/Users/loki', TMPDIR: '/tmp/t/' })

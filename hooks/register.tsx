@@ -3,7 +3,7 @@
 /* @jsxFrag Fragment */
 import type { EngineInterface, On, PluginOptions, Timer } from 'claude-code'
 
-import { agendaOf, argvOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type Run, type Source } from './agenda'
+import { agendaOf, argvOf, inputOf, listIdOf, envelopeOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type Run, type Source } from './agenda'
 import { cachePathOf, entryOf, isFresh, keptOf, keyOf, runsOf, type Entry } from './shared-read'
 import { bandView } from './views/band-view'
 import { agendaTextOf } from './views/text'
@@ -76,7 +76,7 @@ export function isShownAtStart(kept: unknown, settings: Settings): boolean {
 }
 
 type Host = {
-  run: (argv: readonly string[], init: { timeoutMs: number; env: Record<string, string> }) => Promise<Run>
+  run: (argv: readonly string[], init: { timeoutMs: number; env: Record<string, string>; stdin?: string }) => Promise<Run>
   home: () => Promise<string | undefined>
   installed: () => Promise<string>
   now: () => Promise<number>
@@ -119,6 +119,33 @@ async function hostOf($: EngineInterface): Promise<Host> {
     storeGet: key => $.store.get(key),
     storeSet: (key, value) => $.store.set(key, value),
   }
+}
+
+/** Read paginated native results and resolve the configured reminder list first. */
+async function readSource(engine: Host, source: Source, argv: readonly string[], input: Record<string, unknown> | undefined, remindersList: string, env: Record<string, string>): Promise<Run> {
+  if (!input) return engine.run(argv, { timeoutMs: READ_TIMEOUT_MS, env })
+  const payload = { ...input }
+  if (source === 'reminders') {
+    const discovery = await engine.run([argv[0]!, 'reminders_list_lists'], { timeoutMs: READ_TIMEOUT_MS, env, stdin: '{}' })
+    const parsed = envelopeOf(discovery)
+    if ('error' in parsed) throw new Error(parsed.error)
+    payload.list_id = listIdOf(parsed.data, remindersList)
+  }
+  const rows: unknown[] = []
+  const cursors = new Set<string>()
+  for (let pages = 0; pages < 100; pages++) {
+    const run = await engine.run(argv, { timeoutMs: READ_TIMEOUT_MS, env, stdin: JSON.stringify(payload) })
+    const parsed = envelopeOf(run)
+    if ('error' in parsed) return run
+    rows.push(...parsed.data)
+    const data = JSON.parse(run.stdout).data
+    const cursor = data?.next_cursor
+    if (!cursor) return { exitCode: 0, stdout: JSON.stringify({ success: true, data: rows }), stderr: '' }
+    if (typeof cursor !== 'string' || cursors.has(cursor)) throw new Error('invalid native pagination cursor')
+    cursors.add(cursor)
+    payload.cursor = cursor
+  }
+  throw new Error('native pagination exceeded 100 pages')
 }
 
 /**
@@ -164,7 +191,9 @@ export function register(on: On, options: PluginOptions): void {
           argvs[source] = argvOf(source, dirs[source], new Date(at), settings)
         }
 
-        key = keyOf(argvs)
+        const requests = {} as Record<Source, readonly string[]>
+        for (const source of SOURCES) requests[source] = [...argvs[source], JSON.stringify(inputOf(source, new Date(at))) ?? '', source === 'reminders' ? settings.remindersList : '']
+        key = keyOf(requests)
 
         if (shared?.key !== key) {
           break
@@ -197,8 +226,7 @@ export function register(on: On, options: PluginOptions): void {
             runs[source] = new Error(`install ${source === 'e3p' ? 'nycu' : 'macos'}@zyx1121 or configure its scripts directory`)
             return
           }
-          runs[source] = await engine
-            .run(argvs[source], { timeoutMs: READ_TIMEOUT_MS, env })
+          runs[source] = await readSource(engine, source, argvs[source], inputOf(source, new Date(at)), settings.remindersList, env)
             .catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))))
         }),
       )

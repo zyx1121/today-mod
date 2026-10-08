@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -14,7 +15,7 @@ jobs:
       - name: Typecheck
         run: bunx -p typescript tsc -p tsconfig.json
       - name: Install Claude Code
-        run: curl -fsSL https://claude.ai/install.sh | bash
+        run: curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.285
       - name: Plugin tests
         env:
           CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"
