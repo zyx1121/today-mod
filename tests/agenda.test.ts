@@ -1,17 +1,19 @@
 import { describe, expect, test, tier } from 'claude-code/testing'
 
-import { appleDateOf, envelopeOf } from '../hooks/agenda'
+import { scheduleOf, listIdOf, envelopeOf } from '../hooks/agenda'
 import { spanOf } from '../hooks/views/text'
 
 tier('user')
 
 describe('agenda', () => {
-  test('AppleScript dates parse, morning, noon and midnight included', async () => {
-    expect(appleDateOf('Monday, September 21, 2026 at 1:20:00 PM')).toEqual(new Date(2026, 8, 21, 13, 20, 0))
-    expect(appleDateOf('September 21, 2026 at 12:05:00 AM')).toEqual(new Date(2026, 8, 21, 0, 5, 0))
-    expect(appleDateOf('September 21, 2026 at 12:00:00 PM')).toEqual(new Date(2026, 8, 21, 12, 0, 0))
-    expect(appleDateOf('September 21, 2026')).toEqual(new Date(2026, 8, 21, 0, 0, 0))
-    expect(appleDateOf('someday')).toBeNull()
+  test('ISO schedules distinguish local date-only and timed deadlines', async () => {
+    expect(scheduleOf({kind:'datetime',at:'2026-09-21T13:20:00+08:00',time_zone:'Asia/Taipei'})).toEqual(new Date('2026-09-21T13:20:00+08:00'))
+    expect(scheduleOf({kind:'date',date:'2026-09-21'})).toEqual(new Date(2026,8,21,23,59,59,999))
+    expect(scheduleOf({kind:'datetime',at:'invalid'})).toBeNull()
+    expect(scheduleOf(null)).toBeNull()
+    expect(listIdOf([{id:'one',title:'TODO'}], 'TODO')).toBe('one')
+    expect(() => listIdOf([{id:'one',title:'TODO'},{id:'two',title:'TODO'}], 'TODO')).toThrow()
+    expect(listIdOf([{id:'one',title:'TODO'},{id:'two',title:'TODO'}], 'two')).toBe('two')
   })
 
   test('envelopes: success data, failure message with hint, non-JSON, exit code', async () => {

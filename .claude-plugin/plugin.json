@@ -31,7 +31,7 @@
     "remindersList": {
       "type": "string",
       "title": "Reminders list",
-      "description": "The Reminders list to read. TODO by default.",
+      "description": "Unique reminder list title or native list ID. Same-named lists require an ID.",
       "required": false,
       "default": "TODO"
     },

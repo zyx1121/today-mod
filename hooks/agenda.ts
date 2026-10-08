@@ -85,16 +85,44 @@ export function argvOf(
   now: Date,
   options: { remindersList: string; dueDays: number },
 ): readonly string[] {
-  const day = dayOf(now)
-
   switch (source) {
     case 'calendar':
-      return [`${scriptsDir}/calendar.py`, 'list', '--from', `${day}T00:00`, '--to', `${day}T23:59`, '--limit', '50']
+      return [`${scriptsDir}/productivity.py`, 'calendar_list_events']
     case 'reminders':
-      return [`${scriptsDir}/reminders.py`, 'list', '--list', options.remindersList, '--limit', '50']
+      return [`${scriptsDir}/productivity.py`, 'reminders_list']
     case 'e3p':
       return [`${scriptsDir}/e3p.py`, 'due', '--days', String(options.dueDays), '--limit', '50']
   }
+}
+
+/** The JSON request body for a native source; timezone offsets are explicit. */
+export function inputOf(source: Source, now: Date): Record<string, unknown> | undefined {
+  if (source === 'e3p') return undefined
+  if (source === 'reminders') return { completed: false, limit: 100 }
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return { from: from.toISOString(), to: to.toISOString(), limit: 100 }
+}
+
+/** Resolve a configured display name to one native list ID, never the first match. */
+export function listIdOf(rows: unknown[], selector: string): string {
+  const matches = rows.filter((row): row is Record<string, unknown> => isRecord(row) && (row.id === selector || row.title === selector))
+  if (matches.length !== 1 || typeof matches[0]?.id !== 'string') throw new Error(`reminder list '${selector}' is missing or ambiguous; configure its ID`)
+  return matches[0].id
+}
+
+/** Parse v2 date-only or offset-bearing schedules. Date-only tasks are due at the end of their local day. */
+export function scheduleOf(value: unknown): Date | null {
+  if (!isRecord(value)) return null
+  if (value.kind === 'datetime' && typeof value.at === 'string') {
+    const parsed = new Date(value.at)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  if (value.kind === 'date' && typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date)) {
+    const [y,m,d] = value.date.split('-').map(Number)
+    return new Date(y!,m!-1,d!,23,59,59,999)
+  }
+  return null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -130,51 +158,11 @@ export function envelopeOf(run: Run): { data: unknown[] } | { error: string } {
     return { error: `${message}${hint}` }
   }
 
-  return { data: Array.isArray(parsed.data) ? parsed.data : [] }
-}
-
-const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
-
-const APPLE_DATE = /^(?:\w+, )?(\w+) (\d{1,2}), (\d{4})(?: at (\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?$/i
-
-/**
- * The Date an AppleScript date-as-string names (`Monday, September 21, 2026
- * at 1:20:00 PM`), local time; null when it does not parse.
- *
- * @param text the AppleScript string
- * @returns the Date, or null
- */
-export function appleDateOf(text: string): Date | null {
-  const match = APPLE_DATE.exec(text.trim())
-
-  if (!match) {
-    return null
-  }
-
-  const [, monthName, day, year, hour, minute, second, meridiem] = match
-  const month = MONTHS.indexOf((monthName ?? '').toLowerCase())
-
-  if (month < 0) {
-    return null
-  }
-
-  let h = hour === undefined ? 0 : Number(hour)
-
-  if (meridiem?.toUpperCase() === 'PM' && h < 12) {
-    h += 12
-  }
-
-  if (meridiem?.toUpperCase() === 'AM' && h === 12) {
-    h = 0
-  }
-
-  return new Date(Number(year), month, Number(day), h, Number(minute ?? 0), Number(second ?? 0))
+  return { data: Array.isArray(parsed.data) ? parsed.data : isRecord(parsed.data) && Array.isArray(parsed.data.items) ? parsed.data.items : [] }
 }
 
 /**
- * Calendar rows as events, by their time of day. Only the time is used: the
- * argv covers one day, and utils before 0.24.1 gave a recurring event its
- * series' first date.
+ * API v2 calendar occurrences as local event times. Date-only events start at midnight.
  *
  * @param rows the envelope's data
  * @returns the events, earliest first
@@ -183,15 +171,15 @@ export function eventsOf(rows: unknown[]): Event[] {
   const events: Event[] = []
 
   for (const row of rows) {
-    if (!isRecord(row) || typeof row.summary !== 'string') {
+    if (!isRecord(row) || typeof row.title !== 'string') {
       continue
     }
 
-    const start = typeof row.start === 'string' ? appleDateOf(row.start) : null
+    const start = scheduleOf(row.start)
 
     events.push({
-      title: row.summary,
-      minute: start ? start.getHours() * 60 + start.getMinutes() : null,
+      title: row.title,
+      minute: isRecord(row.start) && row.start.kind === 'date' ? 0 : start ? start.getHours() * 60 + start.getMinutes() : null,
       location: typeof row.location === 'string' ? row.location.trim() : '',
     })
   }
@@ -209,13 +197,13 @@ export function remindersOf(rows: unknown[]): Reminder[] {
   const reminders: Reminder[] = []
 
   for (const row of rows) {
-    if (!isRecord(row) || typeof row.name !== 'string' || row.done === true) {
+    if (!isRecord(row) || typeof row.title !== 'string' || row.completed === true) {
       continue
     }
 
     reminders.push({
-      name: row.name,
-      due: typeof row.due === 'string' && row.due !== '' ? appleDateOf(row.due) : null,
+      name: row.title,
+      due: scheduleOf(row.due),
     })
   }
 
