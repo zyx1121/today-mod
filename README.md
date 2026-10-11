@@ -1,85 +1,115 @@
-# today-mod
+<div align="center">
 
-> `/today` for Claude Code: your calendar, E3 deadlines and Reminders in one line above the prompt, and in Claude's context, so it knows your day before you say a word.
+<h1>today-mod</h1>
 
-`claude-code` · `mod` · `function-hooks` · `macos` · `nycu` · `agenda`
+<p><strong>Your calendar, E3 deadlines and Reminders in one line above the Claude Code prompt.</strong></p>
 
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-mod-d97757)](https://github.com/zyx1121/today-mod) &nbsp;[![CI](https://github.com/zyx1121/today-mod/actions/workflows/ci.yml/badge.svg)](https://github.com/zyx1121/today-mod/actions/workflows/ci.yml) &nbsp;[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](#license)
+[![CI](https://img.shields.io/github/actions/workflow/status/zyx1121/today-mod/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/zyx1121/today-mod/actions)
+[![Release](https://img.shields.io/github/v/release/zyx1121/today-mod?style=flat-square&sort=semver)](https://github.com/zyx1121/today-mod/releases)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-mod-d97757?style=flat-square)](https://github.com/anthropics/claude-code/tree/main/mods)
+[![License](https://img.shields.io/github/license/zyx1121/today-mod?style=flat-square)](LICENSE)
+
+**English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+
+</div>
 
 ```
 📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue
 ```
-<sub>The band directly above the prompt: the running or next event with a countdown, deadlines ahead, reminders due. It ticks every minute and re-reads every five, one read shared by every open session.</sub>
 
-Sessions start with "what was I supposed to do today?" and end with a missed class. This mod reads the day once at start, keeps the next thing in view, and hands the whole agenda to Claude as a context block, so "do I have time for this before class?" gets a real answer.
+Sessions often start with "what do I have today?" and end with a missed class. today-mod reads your day once, keeps the next item in view, and gives the full agenda to Claude. Then "do I have time for this before class?" gets a real answer.
 
-It is a Claude Code **mod**: a plugin whose behaviour lives in a TypeScript hooks module. The data comes from [macos](https://github.com/zyx1121/macos) and [nycu](https://github.com/zyx1121/nycu) scripts run as child processes (`productivity.py` with JSON stdin, and `e3p.py`), nothing else.
+## Features
 
-## Install
+- **One line above the prompt**: the current or next event with a countdown, the E3 deadlines ahead and the reminders due.
+- **Agenda in context**: the first message of each conversation gets a `today` block with the full agenda in Markdown.
+- **One read for all sessions**: open sessions share one read every 5 minutes. The countdown updates every minute.
+- **Partial failure stays visible**: a source that fails shows `⚠️` on the line, and the other sources still show.
 
-Function hooks are early access, so the engine loads a mod only with the flag on. Put it in your shell profile or in `settings.json` under `env`:
+## Quick start
 
-```
+Function hooks are in early access. Turn them on in your shell profile, or in `settings.json` under `env`:
+
+```sh
 export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
 ```
 
-Then install it as a plugin, from GitHub or from a local clone:
+Then install the mod in Claude Code:
 
 ```
 /plugin marketplace add zyx1121/today-mod
 /plugin install today-mod@today-mod
 ```
 
-It needs `macos@zyx1121` 0.2.0 or later and `nycu@zyx1121` installed at user scope (or explicit `macosScriptsDir` and `nycuScriptsDir` settings), `uv` at `/opt/homebrew/bin/uv`, Full Access to Calendars and Reminders for your terminal (System Settings > Privacy & Security; macos reads both through EventKit, so neither app opens), and an E3 login configured through [nycu](https://github.com/zyx1121/nycu) for deadlines. A source that is missing or denied is reported on the line and in `/today`; the others still show.
+Start a new session. The line appears above the prompt.
 
-In the session:
+## Usage
 
 ```
-/today          the whole agenda as Markdown
+/today          the full agenda in Markdown
 /today off      hide the line (remembered)
 /today on       show it again
 ```
 
-## What it shows
-
-| Part | Content |
-|------|---------|
-| `📅` | The event running now (`now`) or the next to start today with a countdown (`in 1h 12m`); `no more events today`; `nothing on the calendar today` |
+| Part | Shows |
+|------|-------|
+| `📅` | The event now (`now`) or the next one today (`in 1h 12m`), or `no more events today` |
 | `📝` | E3 deadlines within `dueDays`, and how many fall within 3 days |
-| `☑` | Reminders overdue, and due later today |
-| `⚠️` | How many sources failed; `/today` names them |
-
-The `today` context block carries the same agenda as Markdown: today's events with times and rooms, E3 deadlines with due times and course, open reminders. It is added to the conversation's first message, after the engine's own blocks.
+| `☑` | Reminders that are overdue or due later today |
+| `⚠️` | How many sources failed. `/today` names them |
 
 ## Configuration
 
-| Field | Type | Default | What it does |
-|-------|------|---------|--------------|
-| `macosScriptsDir` | string | current `macos@zyx1121` user installation | Optional directory for macos API v2 `productivity.py` |
-| `nycuScriptsDir` | string | current `nycu@zyx1121` user installation | Optional directory for `e3p.py` |
-| `scriptsDir` | string | empty | Legacy explicit shared directory; separate overrides take precedence |
-| `refreshMs` | number | `300000` | Milliseconds between re-reads. Every open session shares one read per interval. Floored at 60000. |
-| `dueDays` | number | `7` | Days ahead to list E3 deadlines |
-| `remindersList` | string | `TODO` | Unique reminder list name or native ID to read |
-| `showOnStart` | boolean | `true` | Show the line as soon as an interactive session starts. `/today on|off`, once used, wins. |
+| Needs | For |
+|-------|-----|
+| [macos@zyx1121](https://github.com/zyx1121/macos) 0.2.0 or later | Calendar and Reminders through EventKit |
+| [nycu@zyx1121](https://github.com/zyx1121/nycu) with an E3 login | E3 deadlines |
+| `uv` at `/opt/homebrew/bin/uv` | runs the macos and nycu scripts |
+| Full Access to Calendars and Reminders for your terminal | EventKit reads, without opening the apps |
 
-## How it is built
+| Setting | Default | Does |
+|---------|---------|------|
+| `macosScriptsDir` | the `macos@zyx1121` user install | directory of `productivity.py` |
+| `nycuScriptsDir` | the `nycu@zyx1121` user install | directory of `e3p.py` |
+| `refreshMs` | `300000` | time between reads, 60000 at least |
+| `dueDays` | `7` | days ahead for E3 deadlines |
+| `remindersList` | `TODO` | reminder list name or native ID |
+| `showOnStart` | `true` | show the line when a session starts. `/today on` or `off` wins after first use |
 
-- `hooks/register.ts` exports `register(on, options)`. On `session.start` it registers `/today`, reads the three sources in parallel and starts two timers: a re-read every `refreshMs`, a redraw every minute for the countdown. `command.run` answers `/today`. `ui.render` on `AbovePrompt` draws the line. `prompt.context` adds the `today` block, waiting up to 8 seconds for a first read still in flight.
-- `hooks/shared-read.ts` is the reading every session shares: a JSON file at `$TMPDIR/today-mod/agenda.json`, keyed by the three scripts' argv so another day never matches. A session takes the reading there when it is younger than `refreshMs`; while another session's read is under way it waits for that one (up to 35 seconds) instead of walking Calendar again. `/today` answers from a shared reading under a minute old, else reads the sources itself.
-- `hooks/agenda.ts` builds argv and JSON stdin requests, parses API v2 pages and ISO schedules, and resolves the configured reminder list to a unique ID. Pagination is followed rather than silently truncated. Date-only tasks become due at the end of their local day. Shared-cache keys include request bodies and list selection.
-- `hooks/views/text.ts` formats the line and the Markdown; `hooks/views/band-view.tsx` draws the line with `Box` and `Text`.
-- `types/claude-code.d.ts` is the engine contract, copied from [`anthropics/claude-code/mods/types`](https://github.com/anthropics/claude-code/tree/main/mods/types).
+## How it works
 
+- `hooks/register.ts` registers `/today` on `session.start`, reads the 3 sources in parallel and starts the timers. `ui.render` draws the line on `AbovePrompt`, and `prompt.context` adds the `today` block.
+- `hooks/shared-read.ts` keeps the shared read in `$TMPDIR/today-mod/agenda.json`. While one session reads, the others wait for its result, so the mod reads Calendar only once.
+- `hooks/agenda.ts` calls the scripts with JSON on stdin, follows every page and parses the API v2 results.
+
+## Limits
+
+- macOS only, and Claude Code with function hooks turned on.
+- E3 deadlines need an NYCU account.
+
+## For AI agents
+
+Facts for coding agents and LLM tools. The rules for changing the code are in [AGENTS.md](AGENTS.md).
+
+- **Summary**: Claude Code function-hooks mod with a one-line agenda above the prompt and a `today` context block. Sources: macOS Calendar, Reminders and NYCU E3.
+- **Type**: plugin
+- **Interfaces**: slash command `/today [on|off]`, `AbovePrompt` UI line, `today` prompt context block
+- **Install**: `/plugin marketplace add zyx1121/today-mod`, then `/plugin install today-mod@today-mod`
+- **Run**: `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir .`
+- **Verify**: `bunx -p typescript tsc -p tsconfig.json && CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .`
+- **Config**: plugin options `macosScriptsDir`, `nycuScriptsDir`, `scriptsDir` (legacy), `refreshMs`, `dueDays`, `remindersList`, `showOnStart`
+- **Secrets**: none here. The nycu plugin keeps the E3 login.
+- **Limits**: macOS. Needs `macos@zyx1121` 0.2.0 or later, `nycu@zyx1121` and `uv`.
+
+## Development
+
+```sh
+bunx -p typescript tsc -p tsconfig.json                    # typecheck
+CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .   # the engine's test harness
 ```
-bunx -p typescript tsc -p tsconfig.json          # typecheck
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .   # 24 tests, the engine's own harness
-```
 
-## Contributing
-
-Issues and PRs are welcome. Ground rules live in [CONTRIBUTING.md](https://github.com/zyx1121/.github/blob/main/CONTRIBUTING.md).
+`types/claude-code.d.ts` is the engine contract from [anthropics/claude-code/mods/types](https://github.com/anthropics/claude-code/tree/main/mods/types). Release Please opens the release PR.
 
 ## License
 
-[MIT](LICENSE) · the class is at 13:20, you have time
+[MIT](LICENSE)
