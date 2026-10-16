@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/zyx1121/today-mod/compare/v0.5.0...v0.5.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* let the last mod's panels fill the band to its right edge ([#12](https://github.com/zyx1121/today-mod/issues/12)) ([6f49e30](https://github.com/zyx1121/today-mod/commit/6f49e3009472cd705ae11a61854c4520771b370e))
+
 ## [0.5.0](https://github.com/zyx1121/today-mod/compare/v0.4.0...v0.5.0) (2026-10-16)
 
 
