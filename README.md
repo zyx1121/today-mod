@@ -14,7 +14,9 @@
 </div>
 
 ```
-📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue
+╭─ TODAY ──────────────────────────────────────────────────────────────────────╮
+│ 13:20 3D遊戲程式  ED102  in 3h 20m  │  DUE 1  1 within 3d  │  TODO 1 overdue │
+╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
 Sessions often start with "what do I have today?" and end with a missed class. today-mod reads your day once, keeps the next item in view, and gives the full agenda to Claude. Then "do I have time for this before class?" gets a real answer.
@@ -24,7 +26,7 @@ Sessions often start with "what do I have today?" and end with a missed class. t
 - **One line above the prompt**: the current or next event with a countdown, the E3 deadlines ahead and the reminders due.
 - **Agenda in context**: the first message of each conversation gets a `today` block with the full agenda in Markdown.
 - **One read for all sessions**: open sessions share one read every 5 minutes. The countdown updates every minute.
-- **Partial failure stays visible**: a source that fails shows `⚠️` on the line, and the other sources still show.
+- **Partial failure stays visible**: a source that fails shows `FAILED` and turns the panel border red, and the other sources still show.
 
 ## Quick start
 
@@ -53,10 +55,10 @@ Start a new session. The line appears above the prompt.
 
 | Part | Shows |
 |------|-------|
-| `📅` | The event now (`now`) or the next one today (`in 1h 12m`), or `no more events today` |
-| `📝` | E3 deadlines within `dueDays`, and how many fall within 3 days |
-| `☑` | Reminders that are overdue or due later today |
-| `⚠️` | How many sources failed. `/today` names them |
+| Event | The event now (`now`) or the next one today (`in 1h 12m`), or `no more events today` |
+| `DUE` | E3 deadlines within `dueDays`, and how many fall within 3 days |
+| `TODO` | Reminders that are overdue or due later today |
+| `FAILED` | How many sources failed. `/today` names them |
 
 ## Configuration
 

@@ -66,8 +66,11 @@ describe('register', () => {
 
     expect(calendar?.argv.slice(1)).toEqual(['calendar_list_events'])
 
-    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toBe(
-      '📅 13:20 3D遊戲程式 · ED102 · in 3h 20m  📝 1 due (1 within 3d)  ☑ 1 overdue\n(beneath)',
+    const tree = await $.ui.render(Fixtures.BAND)
+
+    expect(Fixtures.beneathOf(tree)).toBe('(beneath)')
+    expect(Fixtures.lineOf(tree)).toBe(
+      '13:20 3D遊戲程式  ED102  in 3h 20m  │  DUE 1  1 within 3d  │  TODO 1 overdue',
     )
   })
 
@@ -78,10 +81,10 @@ describe('register', () => {
     await world.clock.settle()
 
     await world.clock.advance(4 * 60 * 60 * 1000) // 14:00
-    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('📅 13:20 3D遊戲程式 · ED102 · now')
+    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('13:20 3D遊戲程式  ED102  now')
 
     await world.clock.advance(4 * 60 * 60 * 1000) // 18:00
-    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('📅 no more events today')
+    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('no more events today')
   })
 
   test('/today answers with the whole agenda as Markdown', async ($, on) => {
@@ -124,7 +127,7 @@ describe('register', () => {
     expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toBe('(beneath)')
 
     expect(await $.command.run(Fixtures.today('on'))).toEqual({ text: 'Today shown above the prompt' })
-    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('📅 13:20')
+    expect(Fixtures.textOf(await $.ui.render(Fixtures.BAND))).toContain('13:20')
   })
 
   test('a start the person hid draws nothing but still reads, for the context', async ($, on) => {
@@ -153,8 +156,8 @@ describe('register', () => {
 
     const drawn = Fixtures.textOf(await $.ui.render(Fixtures.BAND))
 
-    expect(drawn).toContain('📅 13:20 3D遊戲程式')
-    expect(drawn).toContain('⚠️ 1 source failed')
+    expect(drawn).toContain('13:20 3D遊戲程式')
+    expect(drawn).toContain('FAILED 1 source')
 
     const { text } = await $.command.run(Fixtures.today())
 

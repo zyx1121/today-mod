@@ -6,6 +6,7 @@ import type { EngineInterface, On, PluginOptions, Timer } from 'claude-code'
 import { agendaOf, argvOf, inputOf, listIdOf, envelopeOf, pathOf, READ_TIMEOUT_MS, SOURCES, type Agenda, type Run, type Source } from './agenda'
 import { cachePathOf, entryOf, isFresh, keptOf, keyOf, runsOf, type Entry } from './shared-read'
 import { bandView } from './views/band-view'
+import { rowOf } from './views/panel'
 import { agendaTextOf } from './views/text'
 import { sourceDirs } from './script-paths'
 
@@ -322,16 +323,11 @@ export function register(on: On, options: PluginOptions): void {
 
     const { Box, Text } = $.ui.resolve(e)
     const [mine, beneath] = await Promise.all([
-      bandView({ Box, Text }, agenda, new Date(await $.clock.now())),
+      bandView({ Box, Text }, agenda, new Date(await $.clock.now()), e.props.bodyColumns),
       next(e),
     ])
 
-    return (
-      <Box flexDirection="column">
-        {mine}
-        {beneath}
-      </Box>
-    )
+    return rowOf({ Box, Text }, mine, beneath)
   })
 
   on('prompt.context', async ($, e, next) => {
