@@ -1,4 +1,5 @@
 import type { Agenda, Deadline, Event, Reminder } from '../agenda'
+import { COLOR, type Seg } from './panel'
 
 /** How long an event without an end is taken to run, for "now". */
 export const EVENT_SPAN_MIN = 110
@@ -73,32 +74,51 @@ export function pointerOf(
   return next ? { event: next, kind: 'next' } : null
 }
 
+/** How soon a deadline counts as close. */
+export const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000
+
 /**
- * The one line above the prompt.
+ * The band's line as colored runs.
  *
  * @param agenda what was read
  * @param now the moment
- * @returns `📅 13:20 3D遊戲程式 · ED102 · in 1h 12m  📝 2 due  ☑ 1 overdue`
+ * @returns `13:20 3D遊戲程式  ED102  in 1h 12m │ DUE 2  1 within 3d │ TODO 1 overdue`
  */
-export function bandTextOf(agenda: Agenda, now: Date): string {
+export function bandSegsOf(agenda: Agenda, now: Date): Seg[] {
   const nowMinute = now.getHours() * 60 + now.getMinutes()
   const pointer = pointerOf(agenda.events, nowMinute)
-  const parts: string[] = []
+  const segs: Seg[] = []
+  const gap = () => segs.push({ text: '  │  ', color: COLOR.line })
 
   if (pointer) {
     const { event, kind } = pointer
-    const where = event.location ? ` · ${event.location}` : ''
-    const when = kind === 'now' ? 'now' : `in ${spanOf(event.minute! - nowMinute)}`
 
-    parts.push(`📅 ${clockOf(event.minute!)} ${event.title}${where} · ${when}`)
+    segs.push({ text: `${clockOf(event.minute!)} `, color: COLOR.text })
+    segs.push({ text: event.title, color: COLOR.text, bold: true })
+
+    if (event.location) {
+      segs.push({ text: `  ${event.location}`, color: COLOR.muted })
+    }
+
+    segs.push(
+      kind === 'now'
+        ? { text: '  now', color: COLOR.warn, bold: true }
+        : { text: `  in ${spanOf(event.minute! - nowMinute)}`, color: COLOR.muted },
+    )
   } else {
-    parts.push(agenda.events.length === 0 ? '📅 nothing on the calendar today' : '📅 no more events today')
+    segs.push({ text: agenda.events.length === 0 ? 'no events today' : 'no more events today', color: COLOR.muted })
   }
 
-  const dueSoon = agenda.deadlines.filter(deadline => deadline.due.getTime() - now.getTime() < 3 * 24 * 60 * 60 * 1000)
+  const dueSoon = agenda.deadlines.filter(deadline => deadline.due.getTime() - now.getTime() < DUE_SOON_MS)
 
   if (agenda.deadlines.length > 0) {
-    parts.push(`📝 ${agenda.deadlines.length} due${dueSoon.length ? ` (${dueSoon.length} within 3d)` : ''}`)
+    gap()
+    segs.push({ text: 'DUE ', color: COLOR.label })
+    segs.push({ text: String(agenda.deadlines.length), color: dueSoon.length ? COLOR.warn : COLOR.text, bold: true })
+
+    if (dueSoon.length) {
+      segs.push({ text: `  ${dueSoon.length} within 3d`, color: COLOR.muted })
+    }
   }
 
   const overdue = agenda.reminders.filter(reminder => reminder.due !== null && reminder.due.getTime() <= now.getTime())
@@ -107,14 +127,38 @@ export function bandTextOf(agenda: Agenda, now: Date): string {
   )
 
   if (overdue.length || dueToday.length) {
-    parts.push(`☑ ${[overdue.length ? `${overdue.length} overdue` : null, dueToday.length ? `${dueToday.length} today` : null].filter(Boolean).join(', ')}`)
+    gap()
+    segs.push({ text: 'TODO ', color: COLOR.label })
+
+    if (overdue.length) {
+      segs.push({ text: `${overdue.length} overdue`, color: COLOR.error, bold: true })
+    }
+
+    if (dueToday.length) {
+      segs.push({ text: `${overdue.length ? '  ' : ''}${dueToday.length} today`, color: COLOR.text })
+    }
   }
 
   if (agenda.errors.length) {
-    parts.push(`⚠️ ${agenda.errors.length} source${agenda.errors.length > 1 ? 's' : ''} failed`)
+    gap()
+    segs.push({ text: 'FAILED ', color: COLOR.label })
+    segs.push({ text: `${agenda.errors.length} source${agenda.errors.length > 1 ? 's' : ''}`, color: COLOR.error, bold: true })
   }
 
-  return parts.join('  ')
+  return segs
+}
+
+/**
+ * The band's line as plain text.
+ *
+ * @param agenda what was read
+ * @param now the moment
+ * @returns the runs joined
+ */
+export function bandTextOf(agenda: Agenda, now: Date): string {
+  return bandSegsOf(agenda, now)
+    .map(seg => seg.text)
+    .join('')
 }
 
 function eventLine(event: Event): string {
