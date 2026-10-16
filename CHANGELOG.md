@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/zyx1121/today-mod/compare/v0.5.1...v0.6.0) (2026-10-16)
+
+
+### Features
+
+* color the band panels with the ditto statusline palette ([#14](https://github.com/zyx1121/today-mod/issues/14)) ([962b81a](https://github.com/zyx1121/today-mod/commit/962b81a44620fbe595e77ab2055f77fd612c1032))
+
 ## [0.5.1](https://github.com/zyx1121/today-mod/compare/v0.5.0...v0.5.1) (2026-10-16)
 
 
