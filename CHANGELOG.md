@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/zyx1121/today-mod/compare/v0.6.0...v0.6.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* keep panel borders quiet for warnings ([#16](https://github.com/zyx1121/today-mod/issues/16)) ([b9702d8](https://github.com/zyx1121/today-mod/commit/b9702d8725d8dbf363b8eba1df62899b799c4088))
+
 ## [0.6.0](https://github.com/zyx1121/today-mod/compare/v0.5.1...v0.6.0) (2026-10-16)
 
 
